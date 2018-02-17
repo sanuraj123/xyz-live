@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+
+    <link rel="stylesheet" href="bootstrap/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="bootstrap/js/bootstrap.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/script1.js"  ></script>
+    	<script type="text/javascript" src="https://api.bistri.com/bistri.conference.min.js"></script>
+
+	<script type="text/javascript">
+		/*
+    JS library reference:
+    http://developers.bistri.com/webrtc-sdk/js-library-reference
+*/
+
+var room;
+var members;
+var localStream;
+
+// when Bistri API client is ready, function
+// "onBistriConferenceReady" is invoked
+onBistriConferenceReady = function () {
+
+    // test if the browser is WebRTC compatible
+    if ( !bc.isCompatible() ) {
+        // if the browser is not compatible, display an alert
+        alert( "your browser is not WebRTC compatible !" );
+        // then stop the script execution
+        return;
+    }
+
+    // initialize API client with application keys
+    // if you don't have your own, you can get them at:
+    // https://api.developers.bistri.com/login
+    bc.init( {
+        "appId": "e3ead3c0",
+        "appKey": "4b3bd9454250018bf5c4decba08a0dbb"
+    } );
+    
+    /* Set events handler */
+
+    // when local user is connected to the server
+    bc.signaling.bind( "onConnected", function () {
+        // show pane with id "pane_1"
+        showPanel( "pane_1" );
+    } );
+
+    // when an error occured on the server side
+    bc.signaling.bind( "onError", function ( error ) {
+        // display an alert message
+        alert( error.text + " (" + error.code + ")" );
+    } );
+
+    // when the user has joined a room
+    bc.signaling.bind( "onJoinedRoom", function ( data ) {
+        // set the current room name
+        room = data.room;
+        members = data.members;
+        // ask the user to access to his webcam
+        bc.startStream( "webcam-sd", function( stream ){
+            // affect stream to "localStream" var
+            localStream = stream;
+            // when webcam access has been granted
+            // show pane with id "pane_2"
+            showPanel( "pane_2" );
+            // insert the local webcam stream into div#video_container node
+            bc.attachStream( stream, q( "#video_container" ), { mirror: true } );
+            // then, for every single members present in the room ...
+            for ( var i=0, max=members.length; i<max; i++ ) {
+                // ... request a call
+                bc.call( members[ i ].id, room, { "stream": stream } );
+            }
+        } );
+    } );
+
+    // when an error occurred while trying to join a room
+    bc.signaling.bind( "onJoinRoomError", function ( error ) {
+        // display an alert message
+       alert( error.text + " (" + error.code + ")" );
+    } );
+    
+    // when the local user has quitted the room
+    bc.signaling.bind( "onQuittedRoom", function( room ) {
+        // stop the local stream
+        bc.stopStream( localStream, function(){
+            // remove the stream from the page
+            bc.detachStream( localStream );
+            // show pane with id "pane_1"
+            showPanel( "pane_1" );
+        } );
+    } );
+    
+    // when a new remote stream is received
+    bc.streams.bind( "onStreamAdded", function ( remoteStream ) {
+        // insert the new remote stream into div#video_container node
+        bc.attachStream( remoteStream, q( "#video_container_2" ) );
+    } );
+    
+    // when a remote stream has been stopped
+    bc.streams.bind( "onStreamClosed", function ( stream ) {
+        // remove the stream from the page
+        bc.detachStream( stream );
+    } );
+    
+    // when a local stream cannot be retrieved
+    bc.streams.bind( "onStreamError", function( error ){   
+        switch( error.name ){
+            case "PermissionDeniedError":
+                alert( "Webcam access has not been allowed" );
+                bc.quitRoom( room );
+                break
+            case "DevicesNotFoundError":
+                if( confirm( "No webcam/mic found on this machine. Process call anyway ?" ) ){
+                    // show pane with id "pane_2"
+                    showPanel( "pane_2" );
+                    for ( var i=0, max=members.length; i<max; i++ ) {
+                        // ... request a call
+                        bc.call( members[ i ].id, room );
+                    }
+                }
+                else{
+                    bc.quitRoom( room );  
+                }
+                break
+        }
+    } );
+
+    // bind function "joinConference" to button "Join Conference Room"
+    q( "#join" ).addEventListener( "click", joinConference );
+    
+    // bind function "quitConference" to button "Quit Conference Room"
+    q( "#quit" ).addEventListener( "click", quitConference );
+    
+    // open a new session on the server
+    bc.connect();
+}
+
+// when button "Join Conference Room" has been clicked
+function joinConference(){
+    var roomToJoin = "vineet";
+    // if "Conference Name" field is not empty ...
+    if( roomToJoin ){
+        // ... join the room
+        bc.joinRoom( roomToJoin );
+    }
+    else{
+        // otherwise, display an alert
+        alert( "you must enter a room name !" )
+    }  
+}
+
+// when button "Quit Conference Room" has been clicked
+function quitConference(){
+    // quit the current conference room
+    bc.quitRoom( room );
+}
+
+function showPanel( id ){ 
+    var panes = document.querySelectorAll( ".pane" );
+    // for all nodes matching the query ".pane"
+    for( var i=0, max=panes.length; i<max; i++ ){
+        // hide all nodes except the one to show
+        panes[ i ].style.display = panes[ i ].id == id ? "block" : "none";
+    };
+}
+
+function q( query ){
+    // return the DOM node matching the query
+    return document.querySelector( query );
+}
+	</script>
+	<style type="text/css">
+			
+			#vdo{
+				width:70%;
+				float:left;
+			
+			}
+			#call{
+				width:30%;
+				float:left;
+			
+			}
+			#play-video{
+			margin-left:50px;
+			}
+			
+			#video_container{
+								margin-top: 20px;
+			    
+                margin-left: 3%;
+                text-align: center;
+                width:10%;
+                height:50px;
+								float:left;
+                
+                
+			}
+			#video_container_2{
+					
+					margin-top: 20px;
+					margin-left: 4%;
+					text-align: center;
+					width:80%;
+					height:820px;
+					float:left;
+					
+					
+			}
+            
+			video {
+					width: 100%;
+			}
+			body{
+			background-color:#E6E6FA;
+			}
+			#search-btn{
+				text-align:center;
+			}
+ 
+
+ 
+	</style>
+
+
+
+
+
+		
+    <title>Hello, world!</title>
+		<link rel="icon" href="home.png" type="image/png">
+  </head>
+  <body>
+      
+      <nav class="navbar navbar-inverse"> 
+          <div class="container-fluid">
+              <div class="navbar-header" >
+                  <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navigationBar">
+                      <span class="icon-bar"></span>
+                      <span class="icon-bar"></span>
+                      <span class="icon-bar"></span>
+                  </button>
+                  <a class="navbar-brand" href="#">Rocking World!</a>
+              </div>
+              <div class="collapse navbar-collapse" id="navigationBar">
+                  <ul class="nav navbar-nav">
+                      <li class="active" ><a href="#">Home</a></li>
+                      <li ><a href="#">About us</a></li>
+                      <li class="dropdown"><a class="dropdown-toggle" data-toggle="dropdown" href="#">Contact Us <span class="caret"></span></a>
+                          <ul class="dropdown-menu">
+                              <li><a href="#">Founder</a></li>
+                              <li><a href="#">C.E.O</a></li>
+                              <li><a href="#">HR</a></li>
+                          </ul>
+                      </li>
+                      <li ><a href="#">Frequently asked questions</a></li>
+                  </ul>
+                  <ul class="nav navbar-nav  navbar-right">
+                      <li ><a href="#"><span class="glyphicon glyphicon-user"></span>signup</a></li>
+                      <li ><a href="#"><span class="glyphicon glyphicon-log-in"></span>Log in</a></li>
+                  </ul>
+              </div>
+          </div>
+      </nav>
+      
+      
+      <section>
+          <form id="search-form" name="search-form" onsubmit="return search()" >
+              <div class="fieldcontainer">
+                  <input type="search" id="query" class="search-field" placeholder="search here......" />
+                  <input type="submit" name="search-btn" id="search-btn" value="Search" />
+
+              </div> 
+          </form>
+      </section>
+
+
+			<div id="vdo" >
+				      <div id="play-video"></div>
+							<ul id="results"></ul>
+							<div id="buttons"></div>
+		
+		</div>			
+
+			<div id="call">
+				
+				<div class="pane" id="pane_1" style="display: block">
+
+						<br>
+						<input type="button" value="Video Call" id="join" class="btn btn-lg btn-success">
+				</div>
+				
+				<div class=" pane" id="pane_2" style="display: none">
+						<div id="video_container"></div>
+						<div id="video_container_2"></div>
+						<input type="button" value="Quit Conference Room" id="quit" class="btn btn-danger btn-default btn-block">
+				</div>
+			</div>
+			
+			
+
+
+
+  </body>
+</html>
